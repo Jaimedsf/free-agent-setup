@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # free-agent-setup bootstrap for Linux.
 # Usage: curl -fsSL https://raw.githubusercontent.com/Jaimedsf/free-agent-setup/main/install.sh | bash
-# Pass options with: ... | bash -s -- --dry-run
+# Pass options with: ... | bash -s -- --dry-run   (use a local clone: FREEAGENT_SRC=<folder>)
 set -euo pipefail
 repo="https://github.com/Jaimedsf/free-agent-setup/archive/refs/heads/main.tar.gz"
 
@@ -11,8 +11,8 @@ if ! command -v uv >/dev/null 2>&1; then
     export PATH="$HOME/.local/bin:$PATH"
 fi
 
-here=""
-if [ -n "${BASH_SOURCE[0]:-}" ] && [ -f "${BASH_SOURCE[0]}" ]; then
+here="${FREEAGENT_SRC:-}"
+if [ -z "$here" ] && [ -n "${BASH_SOURCE[0]:-}" ] && [ -f "${BASH_SOURCE[0]}" ]; then
     here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 fi
 if [ -n "$here" ] && grep -q 'name = "freeagent"' "$here/pyproject.toml" 2>/dev/null; then
@@ -24,7 +24,7 @@ else
 fi
 
 # Under `curl | bash` stdin is the exhausted pipe: give prompts the terminal back.
-if [ ! -t 0 ] && [ -r /dev/tty ]; then
+if [ ! -t 0 ] && { true </dev/tty; } 2>/dev/null; then
     exec uv run --quiet --project "$project" python -m freeagent "$@" </dev/tty
 fi
 exec uv run --quiet --project "$project" python -m freeagent "$@"

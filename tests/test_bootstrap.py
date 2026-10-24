@@ -47,3 +47,13 @@ def test_install_ps1_under_iex_does_not_close_the_session():
     out = subprocess.run(["powershell", "-NoProfile", "-Command", cmd], capture_output=True, text=True,
                          timeout=300).stdout
     assert "Installation plan" in out and "still-here" in out
+
+
+@pytest.mark.skipif(not shutil.which("bash"), reason="needs bash")
+def test_install_sh_piped_without_terminal_still_runs():
+    # `curl | bash` with no controlling terminal (CI, automation): /dev/tty exists but cannot be opened
+    script = (ROOT / "install.sh").read_bytes()
+    env = {**__import__("os").environ, "FREEAGENT_SRC": str(ROOT)}
+    r = subprocess.run(["bash", "-s", "--", "--dry-run", "--skip-cloud", "--skip-local", "--lang", "en"],
+                       input=script, capture_output=True, env=env, timeout=300)
+    assert r.returncode == 0 and b"Installation plan" in r.stdout, r.stderr[-400:]
