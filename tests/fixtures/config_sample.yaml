@@ -1,0 +1,29 @@
+_config_version: 51
+
+# =============================================================================
+# Model Configuration
+# =============================================================================
+model:
+  # Default model to use
+  default: "upstage/solar-mini4:free"
+  provider: "nous"
+  base_url: "https://inference-api.nousresearch.com/v1"
+
+plugins:
+  enabled:
+    - omh
+
+# =============================================================================
+# Model Aliases — short names for /model command
+# =============================================================================
+# model_aliases:
+#   opus:
+#     model: some-model
+#     provider: custom
+
+memory:
+  provider: omh
+
+auxiliary:
+  web_extract:
+    provider: auto
