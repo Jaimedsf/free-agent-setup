@@ -1,0 +1,19 @@
+{
+  "local_tiers": [
+    {"min_free_mb": 4096, "max_free_mb": 6143, "model": "bonsai-2:4b", "download_gb": 1.6, "ctx": 32768},
+    {"min_free_mb": 6144, "max_free_mb": 10239, "model": "bonsai-2:9b", "download_gb": 3.2, "ctx": 65536},
+    {"min_free_mb": 10240, "max_free_mb": 16383, "model": "bonsai-2:9b", "download_gb": 3.2, "ctx": 131072},
+    {"min_free_mb": 16384, "max_free_mb": null, "model": "bonsai-2:27b", "download_gb": 8.3, "ctx": 65536}
+  ],
+  "cloud": [
+    {"id": "nvidia-nemotron-ultra", "kind": "nvidia", "model": "nvidia/nemotron-3-ultra-550b-a55b", "alias": "nemotron", "tier": "heavy"},
+    {"id": "ollama-nemotron-ultra", "kind": "ollama-cloud", "model": "nemotron-3-ultra:cloud", "alias": "nemotron-ollama", "tier": "heavy"},
+    {"id": "ollama-nemotron-super", "kind": "ollama-cloud", "model": "nemotron-3-super:cloud", "alias": "nemotron-super", "tier": "mid"},
+    {"id": "ollama-gemma4", "kind": "ollama-cloud", "model": "gemma4:31b-cloud", "alias": "gemma-cloud", "tier": "mid"},
+    {"id": "codex-gpt-6.1-sol", "kind": "codex", "model": "gpt-6.1-sol", "alias": "codex-gpt-6.1-sol", "tier": "heavy"},
+    {"id": "codex-gpt-6-astra", "kind": "codex", "model": "gpt-6-astra", "alias": "codex-gpt-6-astra", "tier": "heavy"},
+    {"id": "codex-gpt-6-luna", "kind": "codex", "model": "gpt-6-luna", "alias": "codex-gpt-6-luna", "tier": "fast"},
+    {"id": "codex-gpt-5.6-terra", "kind": "codex", "model": "gpt-5.6-terra", "alias": "codex-gpt-5.6-terra", "tier": "mid"},
+    {"id": "codex-gpt-reserve", "kind": "codex", "model": "gpt-reserve", "alias": "codex-gpt-reserve", "tier": "fast"}
+  ]
+}
