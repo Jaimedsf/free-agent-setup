@@ -152,18 +152,20 @@ def safe_alias(name: str) -> str:
     return name.replace(".", "-")
 
 
-def _set_aliases(doc, aliases: list[Approved], state: dict) -> None:
+def _set_aliases(doc, aliases: list[Approved], state: dict, *, prune: bool = True) -> None:
     block = doc.get("model_aliases")
     if not isinstance(block, dict):
         block = CommentedMap()
         doc["model_aliases"] = block
     names = [safe_alias(a.alias) for a in aliases]
-    for name in state.get("aliases", []):
-        if name not in names:
-            block.pop(name, None)
+    previous = state.get("aliases", [])
+    if prune:
+        for name in previous:
+            if name not in names:
+                block.pop(name, None)
     for name, a in zip(names, aliases, strict=True):
         block[name] = _endpoint(a, aux=False)  # existing keys keep their position
-    state["aliases"] = names
+    state["aliases"] = names if prune else list(dict.fromkeys(previous + names))
 
 
 def _load_doc(path: Path):
@@ -192,7 +194,7 @@ def _preserving_comments(doc, edit) -> None:
 def write_aliases(path: Path, aliases: list[Approved], state_path: Path) -> None:
     doc, bom, crlf = _load_doc(path)
     state = _load_state(state_path)
-    _preserving_comments(doc, lambda d: _set_aliases(d, aliases, state))
+    _preserving_comments(doc, lambda d: _set_aliases(d, aliases, state, prune=False))
     _write(path, doc, bom, crlf)
     state_path.write_text(json.dumps(state, indent=2), encoding="utf-8")
 

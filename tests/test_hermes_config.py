@@ -205,3 +205,17 @@ def test_fallbacks_dedupe_against_existing_entries(tmp_path):
     assert [f["model"] for f in yaml_load(cfg)["fallback_providers"]] == expected
     apply_selection(cfg, sel(), st)
     assert [f["model"] for f in yaml_load(cfg)["fallback_providers"]] == expected
+
+
+def test_provisional_aliases_do_not_reorder_a_previous_run(tmp_path):
+    from freeagent.hermes_config import write_aliases
+    cfg = copy_fixture(tmp_path)
+    cfg.write_text(cfg.read_text() + "\nmodel_aliases:\n  x-ollama:\n    model: a\n    provider: custom\n"
+                   "  mine:\n    model: b\n    provider: custom\n")
+    st = tmp_path / "s.json"
+    full = sel(aliases=["nemotron", "x-ollama", "local"])
+    apply_selection(cfg, full, st)
+    first = cfg.read_bytes()
+    write_aliases(cfg, [full.aliases[0]], st)        # probe phase: only a subset is (re)written
+    apply_selection(cfg, full, st)
+    assert cfg.read_bytes() == first
