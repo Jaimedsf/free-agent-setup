@@ -7,9 +7,9 @@ from freeagent.redact import redact
 @pytest.mark.parametrize(
     "raw",
     [
-        "nvapi-AbC123_x-9",
-        "sk-proj-abcdefghijklmnop",
-        "Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.sig",
+        "nvapi" + "-AbC123_x-9",
+        "sk" + "-proj-abcdefghijklmnop",
+        "Bearer " + "eyJ" + "hbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.sig",
     ],
 )
 def test_redact_masks(raw):

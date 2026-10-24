@@ -1,0 +1,24 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - name: Lint
+        run: uv run ruff check
+      - name: Tests
+        run: uv run pytest -q
+      - name: Dry run (no GPU, no tools installed)
+        run: uv run python -m freeagent --dry-run --yes --lang en
+      - name: Privacy scan
+        run: uv run python scripts/privacy_scan.py

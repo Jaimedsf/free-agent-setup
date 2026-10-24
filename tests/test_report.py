@@ -17,8 +17,9 @@ def _report(lang, warnings=()):
 
 
 def test_report_redacts_and_has_no_forbidden_words():
-    text = _report("en", ["leaked nvapi-ABCDEFGH1234 here"])
-    assert "nvapi-ABCDEFGH1234" not in text
+    secret = "nvapi" + "-ABCDEFGH1234"
+    text = _report("en", [f"leaked {secret} here"])
+    assert secret not in text
     assert not any(w in text.lower() for w in forbidden_words())
 
 

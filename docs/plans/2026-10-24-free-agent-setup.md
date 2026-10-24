@@ -90,7 +90,8 @@ def test_t_format():
 def test_en_pt_have_same_keys():
     assert set(load("en")) == set(load("pt"))
 
-@pytest.mark.parametrize("raw", ["nvapi-AbC123_x-9", "sk-proj-abcdefghijklmnop", "Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.sig"])
+# chaves falsas montadas por concatenação ("nvapi" + "-...") para não disparar a varredura
+@pytest.mark.parametrize("raw", [FAKE_NVIDIA_KEY, FAKE_SK_KEY, FAKE_BEARER_JWT])
 def test_redact_masks(raw):
     out = redact(f"key={raw} done")
     assert raw not in out and "***" in out and out.endswith(" done")
@@ -453,7 +454,7 @@ Fluxo do `main`:
 
 Os códigos de saída são `0` ok, `1` cancelado, `2` falha de config, `3` falha fatal (Hermes não instalou, sem internet). `--rollback` chama `restore_latest` e retorna 0 se restaurou, 1 se não havia backup.
 
-- [ ] **Step 1: Testes**: `test_select_order_and_fallbacks`; `test_select_local_as_main_when_no_cloud`; `test_select_none`; `test_report_redacts_and_has_no_forbidden_words` (injeta `nvapi-XXXXXXXX` num warning; o relatório não contém o segredo nem nenhuma de `forbidden_words()`); `test_report_pt_and_en_headings`; `test_main_dry_run_writes_nothing` (FakeRunner; nenhuma chamada além de detect; nenhum arquivo criado em tmp HERMES_HOME); `test_main_restores_on_failed_check` (o FakeRunner faz `hermes config check` sair com 1 → arquivos iguais aos originais, exit 2); `test_main_rollback_without_backup_returns_1`.
+- [ ] **Step 1: Testes**: `test_select_order_and_fallbacks`; `test_select_local_as_main_when_no_cloud`; `test_select_none`; `test_report_redacts_and_has_no_forbidden_words` (injeta uma chave NVIDIA falsa (montada por concatenação) num warning; o relatório não contém o segredo nem nenhuma de `forbidden_words()`); `test_report_pt_and_en_headings`; `test_main_dry_run_writes_nothing` (FakeRunner; nenhuma chamada além de detect; nenhum arquivo criado em tmp HERMES_HOME); `test_main_restores_on_failed_check` (o FakeRunner faz `hermes config check` sair com 1 → arquivos iguais aos originais, exit 2); `test_main_rollback_without_backup_returns_1`.
 - [ ] **Step 2:** FAIL. **Step 3:** Implementar. **Step 4:** PASS.
 - [ ] **Step 5:** Rodar `uv run python -m freeagent --dry-run --lang pt` nesta máquina e conferir que o plano mostra a GPU, a faixa `bonsai-2:9b/64k`, os candidatos e o executor `codex`.
 - [ ] **Step 6:** Commit `feat: selection, report and CLI orchestration`.
