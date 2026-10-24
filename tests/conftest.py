@@ -12,12 +12,15 @@ class FakeRunner:
     responses: dict[tuple[str, ...], RunResult] = field(default_factory=dict)
     default: RunResult = RunResult(127, "", "not found")
     calls: list[dict] = field(default_factory=list)
+    on_run: object = None  # optional callable(args) for side effects such as writing a log
 
     def set(self, prefix: tuple[str, ...], result: RunResult) -> None:
         self.responses[prefix] = result
 
     def run(self, args, *, timeout=60, input=None, env=None, interactive=False):
         self.calls.append({"args": list(args), "env": env, "interactive": interactive, "input": input})
+        if self.on_run:
+            self.on_run(list(args))
         best = None
         for prefix, result in self.responses.items():
             if tuple(args[: len(prefix)]) == prefix and (best is None or len(prefix) > len(best[0])):

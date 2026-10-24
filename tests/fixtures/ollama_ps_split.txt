@@ -1,0 +1,2 @@
+NAME                ID              SIZE      PROCESSOR          CONTEXT    BACKEND     UNTIL
+qwen2.5-coder:7b    dae161e27b0e    6.8 GB    9%/91% CPU/GPU    32768      llamacpp    4 minutes from now

@@ -1,0 +1,2 @@
+NAME           ID              SIZE      PROCESSOR    CONTEXT    BACKEND     UNTIL
+bonsai-2:9b    c8b5462f8688    3.8 GB    100% GPU     32768      llamacpp    4 minutes from now

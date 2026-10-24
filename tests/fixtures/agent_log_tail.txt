@@ -1,0 +1,1 @@
+2026-10-24 19:27:51,776 INFO [local-0000] agent.conversation_loop: API call #1: model=nvidia/nemotron-3-ultra-550b-a55b provider=nvidia in=237419 out=192 total=237611 latency=7.1s cache=190080/237419 (80%) id=resp_x
