@@ -33,3 +33,17 @@ def test_install_sh_shellcheck_clean():
     if not shutil.which("shellcheck"):
         pytest.skip("shellcheck not installed")
     assert subprocess.run(["shellcheck", str(ROOT / "install.sh")]).returncode == 0
+
+
+def test_install_sh_reattaches_tty_for_prompts():
+    # under `curl | bash` stdin is the exhausted pipe; prompts must read the terminal
+    assert "</dev/tty" in (ROOT / "install.sh").read_text(encoding="utf-8")
+
+
+@pytest.mark.skipif(not shutil.which("powershell"), reason="needs Windows PowerShell")
+def test_install_ps1_under_iex_does_not_close_the_session():
+    cmd = (f"$env:FREEAGENT_SRC='{ROOT}'; $env:FREEAGENT_ARGS='--dry-run --skip-cloud --skip-local --lang en'; "
+           f"iex (Get-Content -Raw '{ROOT / 'install.ps1'}'); 'still-here'")
+    out = subprocess.run(["powershell", "-NoProfile", "-Command", cmd], capture_output=True, text=True,
+                         timeout=300).stdout
+    assert "Installation plan" in out and "still-here" in out

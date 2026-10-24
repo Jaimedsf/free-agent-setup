@@ -36,5 +36,5 @@
   "report.warnings": "Avisos",
   "report.next": "Próximos passos",
   "report.howto_model": "Troque de modelo dentro do Hermes com /model <atalho> (atalhos acima).",
-  "report.howto_rollback": "Para desfazer tudo: freeagent --rollback"
+  "report.howto_rollback": "Para desfazer tudo (restaura o config do último backup):"
 }

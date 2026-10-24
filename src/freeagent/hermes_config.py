@@ -10,11 +10,12 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-from ruamel.yaml import YAML
+from ruamel.yaml import YAML, YAMLError
 from ruamel.yaml.comments import CommentedMap, CommentedSeq
 
 LOCAL_TASKS = ("title_generation", "session_search", "web_extract")
 _BOM = b"\xef\xbb\xbf"
+_BLOCK_SCALAR = re.compile(r":\s*[|>][-+0-9]*\s*(#.*)?$")
 _KEY = re.compile(r"^(\s*)(- )?([A-Za-z0-9_.-]+)\s*:(\s|$)")
 
 
@@ -44,9 +45,17 @@ class Selection:
 def find_duplicate_keys(text: str) -> list[str]:
     dups: list[str] = []
     stack: list[tuple[int, str, set]] = [(-1, "", set())]
+    block_indent: int | None = None  # inside a `|` / `>` block scalar: its lines are text, not keys
     for line in text.splitlines():
         if not line.strip() or line.lstrip().startswith("#"):
             continue
+        indent_now = len(line) - len(line.lstrip())
+        if block_indent is not None:
+            if indent_now > block_indent:
+                continue
+            block_indent = None
+        if _BLOCK_SCALAR.search(line):
+            block_indent = indent_now
         m = _KEY.match(line)
         if not m:
             continue
@@ -152,20 +161,33 @@ def safe_alias(name: str) -> str:
     return name.replace(".", "-")
 
 
-def _set_aliases(doc, aliases: list[Approved], state: dict, *, prune: bool = True) -> None:
+def _set_aliases(doc, aliases: list[Approved], state: dict, *, prune: bool = True) -> dict[str, str]:
+    """Write our aliases; returns catalog alias -> name actually used in the config.
+
+    A same-named alias the person made (different content, not in our state) is never touched;
+    ours gets a "-free" suffix instead. One with identical content is adopted in place.
+    """
     block = doc.get("model_aliases")
     if not isinstance(block, dict):
         block = CommentedMap()
         doc["model_aliases"] = block
-    names = [safe_alias(a.alias) for a in aliases]
     previous = state.get("aliases", [])
+    names: dict[str, str] = {}
+    for a in aliases:
+        endpoint = _endpoint(a, aux=False)
+        name = safe_alias(a.alias)
+        while name in block and name not in previous and dict(block[name] or {}) != dict(endpoint):
+            name += "-free"
+        names[a.alias] = name
     if prune:
         for name in previous:
-            if name not in names:
+            if name not in names.values():
                 block.pop(name, None)
-    for name, a in zip(names, aliases, strict=True):
-        block[name] = _endpoint(a, aux=False)  # existing keys keep their position
-    state["aliases"] = names if prune else list(dict.fromkeys(previous + names))
+    for a in aliases:
+        block[names[a.alias]] = _endpoint(a, aux=False)  # existing keys keep their position
+    written = list(names.values())
+    state["aliases"] = written if prune else list(dict.fromkeys(previous + written))
+    return names
 
 
 def _load_doc(path: Path):
@@ -173,7 +195,10 @@ def _load_doc(path: Path):
     dups = find_duplicate_keys(text)
     if dups:
         raise ConfigError("duplicate keys: " + ", ".join(dups))
-    doc = _yaml().load(text) or CommentedMap()
+    try:
+        doc = _yaml().load(text) or CommentedMap()
+    except YAMLError as e:
+        raise ConfigError(f"invalid YAML: {e}") from e
     return doc, bom, crlf
 
 
@@ -191,23 +216,27 @@ def _preserving_comments(doc, edit) -> None:
     _put_tail(doc, doc_tail)
 
 
-def write_aliases(path: Path, aliases: list[Approved], state_path: Path) -> None:
+def write_aliases(path: Path, aliases: list[Approved], state_path: Path) -> dict[str, str]:
     doc, bom, crlf = _load_doc(path)
     state = _load_state(state_path)
-    _preserving_comments(doc, lambda d: _set_aliases(d, aliases, state, prune=False))
+    names: dict[str, str] = {}
+    _preserving_comments(doc, lambda d: names.update(_set_aliases(d, aliases, state, prune=False)))
     _write(path, doc, bom, crlf)
     state_path.write_text(json.dumps(state, indent=2), encoding="utf-8")
+    return names
 
 
-def apply_selection(path: Path, sel: Selection, state_path: Path) -> None:
+def apply_selection(path: Path, sel: Selection, state_path: Path) -> dict[str, str]:
     doc, bom, crlf = _load_doc(path)
     state = _load_state(state_path)
-    _preserving_comments(doc, lambda d: _apply(d, sel, state))
+    names: dict[str, str] = {}
+    _preserving_comments(doc, lambda d: names.update(_apply(d, sel, state)))
     _write(path, doc, bom, crlf)
     state_path.write_text(json.dumps(state, indent=2), encoding="utf-8")
+    return names
 
 
-def _apply(doc, sel: Selection, state: dict) -> None:
+def _apply(doc, sel: Selection, state: dict) -> dict[str, str]:
     model = doc.get("model")
     if not isinstance(model, dict):
         model = CommentedMap()
@@ -224,7 +253,7 @@ def _apply(doc, sel: Selection, state: dict) -> None:
     doc["fallback_providers"] = CommentedSeq(ours + kept)
     state["fallbacks"] = [[a.provider, a.model] for a in sel.fallbacks]
 
-    _set_aliases(doc, sel.aliases, state)
+    names = _set_aliases(doc, sel.aliases, state)
 
     aux = doc.get("auxiliary")
     if not isinstance(aux, dict):
@@ -241,3 +270,4 @@ def _apply(doc, sel: Selection, state: dict) -> None:
         else:
             block = _endpoint(sel.compression, aux=True)
         aux[task] = block
+    return names

@@ -23,4 +23,8 @@ else
     project="$(find "$tmp" -mindepth 1 -maxdepth 1 -type d | head -n 1)"
 fi
 
+# Under `curl | bash` stdin is the exhausted pipe: give prompts the terminal back.
+if [ ! -t 0 ] && [ -r /dev/tty ]; then
+    exec uv run --quiet --project "$project" python -m freeagent "$@" </dev/tty
+fi
 exec uv run --quiet --project "$project" python -m freeagent "$@"

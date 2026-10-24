@@ -36,5 +36,5 @@
   "report.warnings": "Warnings",
   "report.next": "Next steps",
   "report.howto_model": "Switch models inside Hermes with /model <alias> (aliases above).",
-  "report.howto_rollback": "Undo everything with: freeagent --rollback"
+  "report.howto_rollback": "Undo everything (restores the config from the latest backup):"
 }

@@ -185,7 +185,9 @@ def test_alias_names_never_contain_dots(tmp_path):
 
 def test_existing_alias_with_same_name_keeps_position(tmp_path):
     cfg = copy_fixture(tmp_path)
-    cfg.write_text(cfg.read_text() + "\nmodel_aliases:\n  nemotron:\n    model: old\n    provider: nvidia\n"
+    # same name AND same content as ours (e.g. made by hand earlier): adopted in place
+    cfg.write_text(cfg.read_text() + "\nmodel_aliases:\n  nemotron:\n    provider: nvidia\n"
+                   "    model: nvidia/nemotron-3-ultra-550b-a55b\n"
                    "  mine:\n    model: x\n    provider: custom\n")
     st = tmp_path / "s.json"
     apply_selection(cfg, sel(aliases=["nemotron"]), st)
@@ -219,3 +221,27 @@ def test_provisional_aliases_do_not_reorder_a_previous_run(tmp_path):
     write_aliases(cfg, [full.aliases[0]], st)        # probe phase: only a subset is (re)written
     apply_selection(cfg, full, st)
     assert cfg.read_bytes() == first
+
+
+def test_user_alias_with_same_name_is_never_touched(tmp_path):
+    cfg = copy_fixture(tmp_path)
+    cfg.write_text(cfg.read_text() + "\nmodel_aliases:\n  nemotron:\n    provider: openrouter\n    model: my/own\n")
+    st = tmp_path / "s.json"
+    names = apply_selection(cfg, sel(aliases=["nemotron"]), st)
+    aliases = yaml_load(cfg)["model_aliases"]
+    assert aliases["nemotron"] == {"provider": "openrouter", "model": "my/own"}
+    assert names["nemotron"] == "nemotron-free" and aliases["nemotron-free"]["provider"] == "nvidia"
+    apply_selection(cfg, sel(aliases=["local"]), st)              # later run without that model
+    assert yaml_load(cfg)["model_aliases"]["nemotron"]["model"] == "my/own"
+
+
+def test_block_scalars_are_not_keys():
+    text = "agent:\n  system_prompt: |\n    Rule: one\n    Rule: two\n  other: 1\n"
+    assert find_duplicate_keys(text) == []
+
+
+def test_invalid_yaml_is_config_error(tmp_path):
+    cfg = tmp_path / "config.yaml"
+    cfg.write_text("model:\n\tdefault: x\n")
+    with pytest.raises(ConfigError):
+        apply_selection(cfg, sel(), tmp_path / "s.json")

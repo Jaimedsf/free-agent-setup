@@ -31,3 +31,17 @@ def test_report_pt_and_en_headings():
 def test_report_lists_rejections_with_reason():
     text = _report("en")
     assert "http_402" in text and "nemotron" in text and "/model" in text and "--rollback" in text
+
+
+def test_rollback_hint_uses_the_bootstrap_command():
+    text = _report("en")                                  # test machine is linux
+    assert "install.sh | bash -s -- --rollback" in text and "freeagent --rollback" not in text
+
+
+def test_report_shows_alias_name_actually_written():
+    m = machine(codex_logged_in=True)
+    plan = make_plan(m, load_catalog())
+    results = [(c, ProbeResult(c.id, c.id == "nvidia-nemotron-ultra", 1.0, "ok")) for c in plan.cloud]
+    text = render_report("en", m, plan, results, None, select(plan, results, None), [],
+                         alias_names={"nemotron": "nemotron-free"})
+    assert "/model nemotron-free" in text

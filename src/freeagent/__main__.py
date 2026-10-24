@@ -71,24 +71,25 @@ def plan_lines(m: Machine, plan: Plan, lang: str) -> list[str]:
 
 
 def configure_and_check(runner: Runner, hermes_home: Path, omh_home: Path, sel: Selection,
-                        now: datetime, *, backup: bool = True) -> bool:
+                        now: datetime, *, backup: bool = True) -> dict[str, str] | None:
     """Backup, write, validate with Hermes itself; restore the latest backup if validation fails.
 
     Pass backup=False when the caller already took the pre-run backup (so a failure restores that one).
+    Returns the alias names actually written (catalog alias -> name in config), or None on failure.
     """
     if backup:
         make_backup(hermes_home, omh_home, now)
     try:
-        apply_selection(hermes_home / "config.yaml", sel, hermes_home / STATE)
+        names = apply_selection(hermes_home / "config.yaml", sel, hermes_home / STATE)
     except ConfigError:
         restore_latest(hermes_home, omh_home)
-        return False
+        return None
     env = {**os.environ, "HERMES_HOME": str(hermes_home)}
     r = runner.run(["hermes", "config", "check"], timeout=120, env=env)
     if r.code != 0 or "formatting error" in (r.out + r.err).lower():
         restore_latest(hermes_home, omh_home)
-        return False
-    return True
+        return None
+    return names
 
 
 def _ask(yes: bool):
@@ -96,7 +97,11 @@ def _ask(yes: bool):
         if yes:
             print(question + " [Y]")
             return True
-        return input(question + " [y/N] ").strip().lower() in ("y", "s", "yes", "sim")
+        try:
+            return input(question + " [y/N] ").strip().lower() in ("y", "s", "yes", "sim")
+        except EOFError:  # no terminal to answer from
+            print("\n(no input available; rerun with --yes to accept the plan)")
+            return False
     return ask
 
 
@@ -172,31 +177,36 @@ def main(argv: list[str] | None = None, runner: Runner | None = None, *, detect=
     now = datetime.now()
     make_backup(home, omh_home, now)
     via_hermes = [c for c in plan.cloud if c.kind in ("nvidia", "codex") and authed[c.kind]]
-    if via_hermes:
-        try:
-            write_aliases(home / "config.yaml", [approved_from(c) for c in via_hermes], home / STATE)
-        except ConfigError as e:
-            print(t("fatal.config", lang, error=str(e)))
-            return EXIT_CONFIG
-    results = []
-    for c in plan.cloud:
-        if not authed[c.kind]:
-            continue
-        if c.kind == "ollama-cloud":
-            r = probe_openai(OLLAMA_BASE + "/v1", "ollama", c.model)
-        else:
-            r = probe_via_hermes(runner, home, c.alias, c.model)
-        print(t("probe.ok", lang, model=c.model, secs=r.latency_s) if r.ok
-              else t("probe.fail", lang, model=c.model, reason=r.reason))
-        results.append((c, r))
-
-    sel = select(plan, results, local)
-    if sel is None:
-        print(t("fatal.no_model", lang))
-        return EXIT_FATAL
+    try:
+        names = {}
+        if via_hermes:
+            names = write_aliases(home / "config.yaml", [approved_from(c) for c in via_hermes], home / STATE)
+        results = []
+        for c in plan.cloud:
+            if not authed[c.kind]:
+                continue
+            if c.kind == "ollama-cloud":
+                r = probe_openai(OLLAMA_BASE + "/v1", "ollama", c.model)
+            else:
+                r = probe_via_hermes(runner, home, names.get(c.alias, c.alias), c.model)
+            print(t("probe.ok", lang, model=c.model, secs=r.latency_s) if r.ok
+                  else t("probe.fail", lang, model=c.model, reason=r.reason))
+            results.append((c, r))
+        sel = select(plan, results, local)
+        if sel is None:
+            restore_latest(home, omh_home)  # drop the provisional aliases of models that never passed
+            print(t("fatal.no_model", lang))
+            return EXIT_FATAL
+    except ConfigError as e:
+        print(t("fatal.config", lang, error=str(e)))
+        return EXIT_CONFIG
+    except BaseException:
+        restore_latest(home, omh_home)  # Ctrl+C or a crash mid-probe must not leave provisional aliases
+        raise
     if sel.main == sel.local:
         warnings.append(t("notes.local_as_main", lang))
-    if not configure_and_check(runner, home, omh_home, sel, now, backup=False):
+    names = configure_and_check(runner, home, omh_home, sel, now, backup=False)
+    if names is None:
         print(t("fatal.config", lang, error="hermes config check"))
         return EXIT_CONFIG
 
@@ -206,7 +216,7 @@ def main(argv: list[str] | None = None, runner: Runner | None = None, *, detect=
     warnings += apply_omh(runner, plan.executor, hermes_chains(approved, sel.local), maestro_chains(codex),
                           global_args=omh_args)
 
-    report = render_report(lang, m, plan, results, local, sel, warnings)
+    report = render_report(lang, m, plan, results, local, sel, warnings, alias_names=names)
     (home / REPORT).write_text(report, encoding="utf-8")
     print("\n" + report)
     print(t("done", lang, path=home / REPORT))
