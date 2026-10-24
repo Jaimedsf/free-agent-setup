@@ -147,16 +147,23 @@ def _put_tail(node, token) -> None:
     entry[i] = token
 
 
+def safe_alias(name: str) -> str:
+    """oh-my-hermes setup crashes on alias names containing '.', so dots become '-'."""
+    return name.replace(".", "-")
+
+
 def _set_aliases(doc, aliases: list[Approved], state: dict) -> None:
     block = doc.get("model_aliases")
     if not isinstance(block, dict):
         block = CommentedMap()
         doc["model_aliases"] = block
+    names = [safe_alias(a.alias) for a in aliases]
     for name in state.get("aliases", []):
-        block.pop(name, None)
-    for a in aliases:
-        block[a.alias] = _endpoint(a, aux=False)
-    state["aliases"] = [a.alias for a in aliases]
+        if name not in names:
+            block.pop(name, None)
+    for name, a in zip(names, aliases, strict=True):
+        block[name] = _endpoint(a, aux=False)  # existing keys keep their position
+    state["aliases"] = names
 
 
 def _load_doc(path: Path):
@@ -210,7 +217,8 @@ def _apply(doc, sel: Selection, state: dict) -> None:
     ours = [_endpoint(a, aux=False) for a in sel.fallbacks]
     previous = {tuple(p) for p in state.get("fallbacks", [])}
     existing = doc.get("fallback_providers") or []
-    kept = [e for e in existing if (e.get("provider"), e.get("model")) not in previous]
+    mine = {(a.provider, a.model) for a in sel.fallbacks}
+    kept = [e for e in existing if (e.get("provider"), e.get("model")) not in previous | mine]
     doc["fallback_providers"] = CommentedSeq(ours + kept)
     state["fallbacks"] = [[a.provider, a.model] for a in sel.fallbacks]
 

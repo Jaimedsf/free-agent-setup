@@ -65,3 +65,8 @@ def test_skip_flags():
 def test_catalog_has_no_forbidden_vendor():
     text = (resources.files("freeagent") / "catalog.json").read_text().lower()
     assert not any(w in text for w in forbidden_words())
+
+
+def test_catalog_aliases_have_no_dots():
+    # oh-my-hermes setup crashes on alias names containing "." (seen on a real install)
+    assert all("." not in c.alias for c in load_catalog().cloud)

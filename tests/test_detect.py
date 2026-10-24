@@ -63,3 +63,12 @@ def test_codex_present_not_logged_in(fake_runner):
 def test_other_agents_listed(fake_runner):
     m = detect_machine(fake_runner, which=lambda c: "/x/" + c if c in ("gemini", "agy") else None)
     assert m.tools.other_agents == ("gemini", "agy")
+
+
+def test_unloads_own_local_model_before_measuring_vram(fake_runner):
+    # a previous run leaves freeagent-local loaded, which would hide its own VRAM from the measurement
+    fake_runner.set(("nvidia-smi",), RunResult(0, fixture("nvidia_smi_one.csv"), ""))
+    detect_machine(fake_runner, which=lambda c: "/x/" + c if c in ("nvidia-smi", "ollama") else None)
+    args = [c["args"] for c in fake_runner.calls]
+    assert args.index(["ollama", "stop", "freeagent-local"]) < args.index(
+        ["nvidia-smi", "--query-gpu=name,memory.total,memory.free", "--format=csv,noheader,nounits"])

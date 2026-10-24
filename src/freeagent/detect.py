@@ -107,6 +107,9 @@ def _ram_gb(os_name: str) -> float:
 
 
 def _gpu(runner: Runner, which: Callable[[str], str | None]) -> Gpu | None:
+    if which("ollama"):
+        # A previous run leaves our local model loaded; measure VRAM without it.
+        runner.run(["ollama", "stop", "freeagent-local"], timeout=30)
     if which("nvidia-smi"):
         r = runner.run(["nvidia-smi", "--query-gpu=name,memory.total,memory.free",
                         "--format=csv,noheader,nounits"], timeout=20)

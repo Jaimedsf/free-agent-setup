@@ -174,3 +174,34 @@ def test_comments_after_replaced_blocks_survive(tmp_path):
         assert c in text
     assert text.index("# Privacy section") < text.index("privacy:")
     assert text.index("# Comment after fallbacks") < text.index("updates:")
+
+
+def test_alias_names_never_contain_dots(tmp_path):
+    cfg = copy_fixture(tmp_path)
+    a = Approved("codex-gpt-5.6-terra", "openai-codex", "gpt-5.6-terra")
+    apply_selection(cfg, Selection(main=a, fallbacks=[], local=None, compression=a, aliases=[a]), tmp_path / "s.json")
+    assert set(yaml_load(cfg)["model_aliases"]) == {"codex-gpt-5-6-terra"}
+
+
+def test_existing_alias_with_same_name_keeps_position(tmp_path):
+    cfg = copy_fixture(tmp_path)
+    cfg.write_text(cfg.read_text() + "\nmodel_aliases:\n  nemotron:\n    model: old\n    provider: nvidia\n"
+                   "  mine:\n    model: x\n    provider: custom\n")
+    st = tmp_path / "s.json"
+    apply_selection(cfg, sel(aliases=["nemotron"]), st)
+    first = list(yaml_load(cfg)["model_aliases"])
+    apply_selection(cfg, sel(aliases=["nemotron"]), st)
+    assert list(yaml_load(cfg)["model_aliases"]) == first == ["nemotron", "mine"]
+
+
+def test_fallbacks_dedupe_against_existing_entries(tmp_path):
+    cfg = copy_fixture(tmp_path)
+    cfg.write_text(cfg.read_text() + "\nfallback_providers:\n  - provider: custom\n"
+                   "    base_url: http://127.0.0.1:11434/v1\n    model: nemotron-3-ultra:cloud\n"
+                   "  - provider: mine\n    model: m1\n")
+    st = tmp_path / "s.json"
+    expected = ["nemotron-3-ultra:cloud", "gpt-reserve", "m1"]
+    apply_selection(cfg, sel(), st)
+    assert [f["model"] for f in yaml_load(cfg)["fallback_providers"]] == expected
+    apply_selection(cfg, sel(), st)
+    assert [f["model"] for f in yaml_load(cfg)["fallback_providers"]] == expected
