@@ -28,3 +28,10 @@ class FakeRunner:
 @pytest.fixture
 def fake_runner():
     return FakeRunner()
+
+
+FIXTURES = __import__("pathlib").Path(__file__).parent / "fixtures"
+
+
+def fixture(name: str) -> str:
+    return (FIXTURES / name).read_text(encoding="utf-8")
