@@ -31,7 +31,9 @@ def sel(*, aliases=("nemotron", "local"), local="default"):
     main = Approved("nemotron", "nvidia", "nvidia/nemotron-3-ultra-550b-a55b", tier="heavy")
     fb = Approved("nemotron-ollama", "custom", "nemotron-3-ultra:cloud", OLLAMA, "ollama", "heavy")
     comp = Approved("codex-gpt-reserve", "openai-codex", "gpt-reserve", tier="fast")
-    loc = Approved("local", "custom", "freeagent-local", OLLAMA, "ollama", "fast") if local == "default" else local
+    loc = local
+    if local == "default":
+        loc = Approved("local", "custom", "freeagent-local", OLLAMA, "ollama", "fast")
     pool = {a.alias: a for a in (main, fb, comp, loc) if a}
     al = [pool.get(n) or Approved(n, "custom", n + "-model", OLLAMA, "ollama") for n in aliases]
     return Selection(main=main, fallbacks=[fb, comp], local=loc, compression=comp, aliases=al)
@@ -59,7 +61,8 @@ def test_fallbacks_and_aux(tmp_path):
     apply_selection(cfg, sel(), tmp_path / "s.json")
     d = yaml_load(cfg)
     assert [f["model"] for f in d["fallback_providers"]] == ["nemotron-3-ultra:cloud", "gpt-reserve"]
-    assert d["auxiliary"]["compression"] == {"provider": "codex", "model": "gpt-reserve", "reasoning_effort": "low"}
+    comp = {"provider": "codex", "model": "gpt-reserve", "reasoning_effort": "low"}
+    assert d["auxiliary"]["compression"] == comp
     t = d["auxiliary"]["title_generation"]
     assert t["base_url"] == OLLAMA and t["model"] == "freeagent-local" and t["timeout"] == 120
     assert t["fallback_chain"] == [{"provider": "codex", "model": "gpt-reserve"}]
