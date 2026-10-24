@@ -1,4 +1,7 @@
 {
   "plan.title": "Plano de instalação",
-  "probe.ok": "{model} respondeu em {secs}s"
+  "probe.ok": "{model} respondeu em {secs}s",
+  "auth.nvidia.ask": "Ativar o NVIDIA build (chave grátis em {url})? Uma página abre no navegador; cole a chave no prompt oculto.",
+  "auth.ollama.ask": "Ativar os modelos gratuitos do Ollama Cloud? Isso roda 'ollama signin' no navegador.",
+  "auth.codex.ask": "Reaproveitar o seu login do Codex no Hermes?"
 }

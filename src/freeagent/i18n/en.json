@@ -1,4 +1,7 @@
 {
   "plan.title": "Installation plan",
-  "probe.ok": "{model} answered in {secs}s"
+  "probe.ok": "{model} answered in {secs}s",
+  "auth.nvidia.ask": "Enable NVIDIA build (free API key from {url})? A browser page opens; paste the key into the hidden prompt.",
+  "auth.ollama.ask": "Enable Ollama Cloud free models? This runs 'ollama signin' in your browser.",
+  "auth.codex.ask": "Reuse your existing Codex login in Hermes?"
 }
