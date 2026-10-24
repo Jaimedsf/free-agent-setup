@@ -134,7 +134,8 @@ class FakeOllama:
             self.ctx = int(text.split("num_ctx")[1].split()[0])
             pct = self.gpu_by_ctx(self.ctx)
             proc = "100% GPU" if pct == 100 else f"{100 - pct}%/{pct}% CPU/GPU"
-            self.runner.set(("ollama", "ps"), RunResult(0, f"NAME ID SIZE PROCESSOR\nfreeagent-local:latest x 1 GB {proc} 1 llamacpp now\n", ""))
+            ps = f"NAME ID SIZE PROCESSOR\nfreeagent-local:latest x 1 GB {proc} 1 llamacpp now\n"
+            self.runner.set(("ollama", "ps"), RunResult(0, ps, ""))
 
     def post(self, url, body, timeout):
         return {"eval_count": 100, "eval_duration": 1_000_000_000}
