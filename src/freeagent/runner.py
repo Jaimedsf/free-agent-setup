@@ -1,3 +1,5 @@
+import os
+import shutil
 import subprocess
 from dataclasses import dataclass
 from typing import Protocol
@@ -26,6 +28,10 @@ class SubprocessRunner:
     """Runs real commands. Interactive commands inherit the terminal so prompts reach the person."""
 
     def run(self, args, *, timeout=60, input=None, env=None, interactive=False):
+        # Resolve through PATH/PATHEXT so Windows .cmd shims (e.g. omh.cmd) are found by bare name.
+        path = (env or os.environ).get("PATH")
+        exe = shutil.which(args[0], path=path) if args else None
+        args = [exe, *args[1:]] if exe else list(args)
         try:
             if interactive:
                 proc = subprocess.run(args, env=env, timeout=timeout)
