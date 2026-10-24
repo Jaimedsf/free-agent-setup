@@ -1,5 +1,6 @@
 import re
 import shutil
+import sys
 import subprocess
 from pathlib import Path
 
@@ -49,7 +50,8 @@ def test_install_ps1_under_iex_does_not_close_the_session():
     assert "Installation plan" in out and "still-here" in out
 
 
-@pytest.mark.skipif(not shutil.which("bash"), reason="needs bash")
+@pytest.mark.skipif(sys.platform == "win32" or not shutil.which("bash"),
+                    reason="install.sh targets Linux; on Windows runners `bash` may be the absent WSL shim")
 def test_install_sh_piped_without_terminal_still_runs():
     # `curl | bash` with no controlling terminal (CI, automation): /dev/tty exists but cannot be opened
     script = (ROOT / "install.sh").read_bytes()
