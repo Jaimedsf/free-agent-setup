@@ -14,7 +14,8 @@ from freeagent.policy import forbidden_words  # noqa: E402
 PATTERNS = [
     ("user path", re.compile(r"[A-Za-z]:\\Users\\(?![%$<])[^\\\s\"']+")),
     ("user path", re.compile(r"/home/(?!runner/)[a-z][\w-]*/")),
-    ("e-mail", re.compile(r"[\w.+-]+@(?!users\.noreply\.github\.com)[\w-]+\.[\w.-]+")),
+    # domain must end in a letters-only TLD, so `action@v10.3.2` version pins are not e-mails
+    ("e-mail", re.compile(r"[\w.+-]+@(?!users\.noreply\.github\.com)[\w-]+(?:\.[\w-]+)*\.[A-Za-z]{2,}\b")),
     ("secret", re.compile(r"nvapi-[\w-]{8,}")),
     ("secret", re.compile(r"sk-[\w-]{16,}")),
     ("secret", re.compile(r"gh[pousr]_\w{20,}")),

@@ -32,6 +32,7 @@ def test_scan_flags_forbidden_words(tmp_path):
     "31625431+Jaimedsf" + "@users.noreply.github.com",
     "C:\\" + U + r"\%USERNAME%\x",
     "/home/runner/work",
+    "uses: astral-sh/setup-uv@v10.3.2",
 ])
 def test_scan_allows(tmp_path, line):
     f = tmp_path / "x.md"
