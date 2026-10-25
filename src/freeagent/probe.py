@@ -9,16 +9,20 @@ import tempfile
 import time
 import urllib.error
 import urllib.request
+from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
 
-from freeagent.catalog import LocalTier
+from freeagent.catalog import CloudCandidate, LocalTier
 from freeagent.runner import Runner
 
 OLLAMA_BASE = "http://127.0.0.1:11434"
 LOCAL_NAME = "freeagent-local"
 MIN_CTX = 16384
 PROMPT = "Reply only: OK"
+PROBE_WORKERS = 4  # few enough to stay inside free-tier per-minute limits
+NO_USAGE_REPORT = "no_usage_report"
 _SERVED = re.compile(r"API call #1: model=(\S+) provider=(\S+)")
 _GPU = re.compile(r"(?:(\d+)%/(\d+)% CPU/GPU|(\d+)% GPU|(\d+)% CPU)")
 
@@ -87,7 +91,31 @@ def probe_openai(base_url: str, api_key: str, model: str, timeout: float = 90) -
 
 
 def probe_via_hermes(runner: Runner, hermes_home: Path, alias: str, expect_model: str) -> ProbeResult:
-    """Ask Hermes itself through an alias; only counts if the expected model served it (not a fallback)."""
+    """Ask Hermes itself through an alias; only counts if the expected model served it (not a fallback).
+
+    Each run writes its own usage report naming the model that answered, so several can run at once.
+    """
+    env = {**os.environ, "HERMES_HOME": str(hermes_home)}
+    with tempfile.TemporaryDirectory(prefix="freeagent-probe-") as tmp:
+        usage = Path(tmp) / "usage.json"
+        start = time.monotonic()
+        r = runner.run(["hermes", "-z", PROMPT, "-m", alias, "--usage-file", str(usage)], timeout=180, env=env)
+        latency = round(time.monotonic() - start, 1)
+        try:
+            report = json.loads(usage.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            report = None
+    if not isinstance(report, dict):
+        return ProbeResult(alias, False, None, NO_USAGE_REPORT)
+    if report.get("failed") or not report.get("api_calls") or not r.out.strip():
+        return ProbeResult(alias, False, None, f"no_response_exit_{r.code}")
+    if report.get("model") != expect_model:
+        return ProbeResult(alias, False, None, "served_by_other")
+    return ProbeResult(alias, True, latency, "ok")
+
+
+def probe_via_hermes_log(runner: Runner, hermes_home: Path, alias: str, expect_model: str) -> ProbeResult:
+    """For a Hermes without --usage-file: who answered is read from the shared agent.log, so one at a time."""
     log = hermes_home / "logs" / "agent.log"
     offset = log.stat().st_size if log.exists() else 0
     env = {**os.environ, "HERMES_HOME": str(hermes_home)}
@@ -105,6 +133,34 @@ def probe_via_hermes(runner: Runner, hermes_home: Path, alias: str, expect_model
     if served[1] != expect_model:
         return ProbeResult(alias, False, None, "served_by_other")
     return ProbeResult(alias, True, latency, "ok")
+
+
+def probe_cloud(runner: Runner, hermes_home: Path, candidates: list[CloudCandidate], alias_names: dict[str, str],
+                on_result: Callable[[CloudCandidate, ProbeResult], None]) -> list[tuple[CloudCandidate, ProbeResult]]:
+    """Probe the candidates concurrently; results come back in candidate order, on_result as each finishes."""
+    def one(c: CloudCandidate) -> ProbeResult:
+        if c.kind == "ollama-cloud":
+            return probe_openai(OLLAMA_BASE + "/v1", "ollama", c.model)
+        return probe_via_hermes(runner, hermes_home, alias_names.get(c.alias, c.alias), c.model)
+
+    done: dict[str, ProbeResult] = {}
+    pool = ThreadPoolExecutor(max_workers=PROBE_WORKERS)
+    try:
+        futures = {pool.submit(one, c): c for c in candidates}
+        for f in as_completed(futures):
+            c, r = futures[f], f.result()
+            if r.reason != NO_USAGE_REPORT:  # an older Hermes: retried below, one at a time
+                done[c.id] = r
+                on_result(c, r)
+    except BaseException:
+        pool.shutdown(wait=False, cancel_futures=True)  # Ctrl+C: do not start the probes still queued
+        raise
+    pool.shutdown()
+    for c in candidates:
+        if c.id not in done:
+            done[c.id] = probe_via_hermes_log(runner, hermes_home, alias_names.get(c.alias, c.alias), c.model)
+            on_result(c, done[c.id])
+    return [(c, done[c.id]) for c in candidates]
 
 
 def _spawn(os_name: str) -> None:

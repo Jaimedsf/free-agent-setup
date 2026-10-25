@@ -22,13 +22,7 @@ from freeagent.install import (
 )
 from freeagent.omh_routing import apply_omh, hermes_chains, maestro_chains
 from freeagent.plan import Plan, make_plan
-from freeagent.probe import (
-    OLLAMA_BASE,
-    ensure_ollama_running,
-    fit_local,
-    probe_openai,
-    probe_via_hermes,
-)
+from freeagent.probe import ensure_ollama_running, fit_local, probe_cloud
 from freeagent.report import render_report
 from freeagent.runner import Runner, SubprocessRunner
 from freeagent.select import approved_from, select
@@ -192,17 +186,9 @@ def main(argv: list[str] | None = None, runner: Runner | None = None, *, detect=
         names = {}
         if via_hermes:
             names = write_aliases(home / "config.yaml", [approved_from(c) for c in via_hermes], home / STATE)
-        results = []
-        for c in plan.cloud:
-            if not authed[c.kind]:
-                continue
-            if c.kind == "ollama-cloud":
-                r = probe_openai(OLLAMA_BASE + "/v1", "ollama", c.model)
-            else:
-                r = probe_via_hermes(runner, home, names.get(c.alias, c.alias), c.model)
-            print(t("probe.ok", lang, model=c.model, secs=r.latency_s) if r.ok
-                  else t("probe.fail", lang, model=c.model, reason=r.reason))
-            results.append((c, r))
+        results = probe_cloud(runner, home, [c for c in plan.cloud if authed[c.kind]], names,
+                              lambda c, r: print(t("probe.ok", lang, model=c.model, secs=r.latency_s) if r.ok
+                                                 else t("probe.fail", lang, model=c.model, reason=r.reason)))
         sel = select(plan, results, local)
         if sel is None:
             restore_latest(home, omh_home)  # drop the provisional aliases of models that never passed
