@@ -58,6 +58,7 @@ long coding sessions need far more context than a small local model holds.
 |---|---|---|
 | NVIDIA build | a free API key from [build.nvidia.com](https://build.nvidia.com/) | `nemotron-3-ultra` |
 | Ollama Cloud | a free account (`ollama signin`) | `nemotron-3-ultra:cloud`, `nemotron-3-super:cloud`, `gemma4:31b-cloud` |
+| Google AI Studio | a free API key from [aistudio.google.com](https://aistudio.google.com/apikey) | `gemini-3.6-flash`, `gemini-3.5-flash-lite` |
 | Codex | only if the Codex CLI is already signed in on this machine | the models your plan accepts |
 
 The first model that passes becomes the main model, and the others become automatic fallbacks. If none passes, the

@@ -1,4 +1,4 @@
-from freeagent.auth import auth_codex, auth_nvidia, auth_ollama
+from freeagent.auth import auth_codex, auth_gemini, auth_nvidia, auth_ollama
 from freeagent.runner import RunResult
 from tests.conftest import machine
 
@@ -58,3 +58,14 @@ def test_ollama_signin_when_accepted(fake_runner):
 def test_ollama_already_signed_in(fake_runner):
     assert auth_ollama(fake_runner, "en", ask=_never, signed_in=lambda: True).status == "ok"
     assert fake_runner.calls == []
+
+
+def test_gemini_runs_hermes_prompt_interactively(fake_runner):
+    fake_runner.set(("hermes", "auth", "status"), RunResult(0, "gemini: logged out", ""))
+    fake_runner.set(("hermes", "auth", "add"), RunResult(0, "", ""))
+    opened = []
+    out = auth_gemini(fake_runner, "en", ask=lambda q: True, open_url=opened.append)
+    add = [c for c in fake_runner.calls if c["args"][:3] == ["hermes", "auth", "add"]][0]
+    assert add["args"] == ["hermes", "auth", "add", "gemini", "--type", "api-key"]
+    assert add["interactive"] is True
+    assert opened == ["https://aistudio.google.com/apikey"] and out.status == "ok"

@@ -10,6 +10,8 @@
     {"id": "ollama-nemotron-ultra", "kind": "ollama-cloud", "model": "nemotron-3-ultra:cloud", "alias": "nemotron-ollama", "tier": "heavy"},
     {"id": "ollama-nemotron-super", "kind": "ollama-cloud", "model": "nemotron-3-super:cloud", "alias": "nemotron-super", "tier": "mid"},
     {"id": "ollama-gemma4", "kind": "ollama-cloud", "model": "gemma4:31b-cloud", "alias": "gemma-cloud", "tier": "mid"},
+    {"id": "gemini-flash", "kind": "gemini", "model": "gemini-3.6-flash", "alias": "gemini-flash", "tier": "mid"},
+    {"id": "gemini-flash-lite", "kind": "gemini", "model": "gemini-3.5-flash-lite", "alias": "gemini-flash-lite", "tier": "fast"},
     {"id": "codex-gpt-6.1-sol", "kind": "codex", "model": "gpt-6.1-sol", "alias": "codex-gpt-6-1-sol", "tier": "heavy"},
     {"id": "codex-gpt-6-astra", "kind": "codex", "model": "gpt-6-astra", "alias": "codex-gpt-6-astra", "tier": "heavy"},
     {"id": "codex-gpt-6-luna", "kind": "codex", "model": "gpt-6-luna", "alias": "codex-gpt-6-luna", "tier": "fast"},

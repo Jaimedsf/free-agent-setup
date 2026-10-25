@@ -7,7 +7,7 @@ import webbrowser
 from datetime import datetime
 from pathlib import Path
 
-from freeagent.auth import auth_codex, auth_nvidia, auth_ollama
+from freeagent.auth import auth_codex, auth_gemini, auth_nvidia, auth_ollama
 from freeagent.backup import make_backup, restore_latest
 from freeagent.catalog import load_catalog
 from freeagent.detect import Machine, detect_machine
@@ -156,10 +156,12 @@ def main(argv: list[str] | None = None, runner: Runner | None = None, *, detect=
         (home / "config.yaml").write_text("{}\n", encoding="utf-8")
 
     kinds = {c.kind for c in plan.cloud}
-    authed = {"ollama-cloud": False, "nvidia": False, "codex": False}
+    authed = {"ollama-cloud": False, "nvidia": False, "gemini": False, "codex": False}
     ollama_up = ("ollama-cloud" in kinds or plan.local) and ensure_ollama_running(runner, m.os)
     if "nvidia" in kinds:
         authed["nvidia"] = auth_nvidia(runner, lang, ask, webbrowser.open).status == "ok"
+    if "gemini" in kinds:
+        authed["gemini"] = auth_gemini(runner, lang, ask, webbrowser.open).status == "ok"
     if "ollama-cloud" in kinds and ollama_up:
         authed["ollama-cloud"] = auth_ollama(runner, lang, ask).status == "ok"
     if "codex" in kinds:
@@ -176,7 +178,7 @@ def main(argv: list[str] | None = None, runner: Runner | None = None, *, detect=
 
     now = datetime.now()
     make_backup(home, omh_home, now)
-    via_hermes = [c for c in plan.cloud if c.kind in ("nvidia", "codex") and authed[c.kind]]
+    via_hermes = [c for c in plan.cloud if c.kind in ("nvidia", "gemini", "codex") and authed[c.kind]]
     try:
         names = {}
         if via_hermes:
