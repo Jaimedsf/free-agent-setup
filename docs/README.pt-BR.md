@@ -59,6 +59,7 @@ principal, porque sessões longas de programação precisam de muito mais contex
 |---|---|---|
 | NVIDIA build | uma chave grátis em [build.nvidia.com](https://build.nvidia.com/) | `nemotron-3-ultra` |
 | Ollama Cloud | uma conta grátis (`ollama signin`) | `nemotron-3-ultra:cloud`, `nemotron-3-super:cloud`, `gemma4:31b-cloud` |
+| Google AI Studio | uma chave grátis em [aistudio.google.com](https://aistudio.google.com/apikey) | `gemini-3.6-flash`, `gemini-3.5-flash-lite` |
 | Codex | só se o Codex CLI já estiver logado nesta máquina | os modelos que o seu plano aceita |
 
 O primeiro aprovado vira o modelo principal e os outros viram reservas automáticas. Se nenhum passar, o modelo local

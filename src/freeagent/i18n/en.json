@@ -3,6 +3,7 @@
   "probe.ok": "{model} answered in {secs}s",
   "auth.nvidia.ask": "Enable NVIDIA build (free API key from {url})? A browser page opens; paste the key into the hidden prompt.",
   "auth.ollama.ask": "Enable Ollama Cloud free models? This runs 'ollama signin' in your browser.",
+  "auth.gemini.ask": "Enable Google AI Studio (free Gemini API key from {url})? A browser page opens; paste the key into the hidden prompt.",
   "auth.codex.ask": "Reuse your existing Codex login in Hermes?",
   "plan.machine": "Machine: {os} · RAM {ram} GB · {cpu} cores · GPU: {gpu}",
   "plan.local": "Local model (on your GPU): {model} ({size} GB download), target context {ctx}",

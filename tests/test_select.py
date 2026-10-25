@@ -1,7 +1,7 @@
 from freeagent.catalog import load_catalog
 from freeagent.plan import make_plan
 from freeagent.probe import LocalResult, ProbeResult
-from freeagent.select import select
+from freeagent.select import approved_from, select
 from tests.conftest import machine
 
 
@@ -34,3 +34,9 @@ def test_select_local_as_main_when_no_cloud():
 def test_select_none():
     plan = make_plan(machine(), load_catalog())
     assert select(plan, _results(plan, set()), None) is None
+
+
+def test_gemini_uses_hermes_builtin_provider():
+    by_id = {c.id: c for c in make_plan(machine(), load_catalog()).cloud}
+    a = approved_from(by_id["gemini-flash"])
+    assert (a.provider, a.model, a.base_url, a.api_key) == ("gemini", "gemini-3.6-flash", None, None)
