@@ -9,7 +9,7 @@ from pathlib import Path
 
 from freeagent.auth import auth_codex, auth_gemini, auth_nvidia, auth_ollama
 from freeagent.backup import make_backup, restore_latest
-from freeagent.catalog import load_catalog
+from freeagent.catalog import CatalogError, choose_catalog
 from freeagent.detect import Machine, detect_machine
 from freeagent.hermes_config import ConfigError, Selection, apply_selection, write_aliases
 from freeagent.i18n import t
@@ -48,6 +48,7 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
     p.add_argument("--rollback", action="store_true")
     p.add_argument("--hermes-home", type=Path, help="explicit Hermes home (not persisted)")
     p.add_argument("--omh-home", type=Path, help="explicit oh-my-hermes home")
+    p.add_argument("--catalog", help="model catalog: https URL, file path, or 'bundled' (default: latest online)")
     return p.parse_args(argv)
 
 
@@ -129,16 +130,24 @@ def main(argv: list[str] | None = None, runner: Runner | None = None, *, detect=
 
     m = detect(runner)
     lang = args.lang or m.lang
-    cat = load_catalog()
+    try:
+        cat, cat_problem = choose_catalog(args.catalog)
+    except CatalogError as e:
+        print(t("fatal.catalog", lang, source=args.catalog, error=str(e)))
+        return EXIT_FATAL
     plan = make_plan(m, cat, skip_local=args.skip_local, skip_cloud=args.skip_cloud)
     print("\n".join(plan_lines(m, plan, lang)))
+    print(t("plan.catalog", lang, source=cat.source))
+    cat_warning = t("warn.catalog_fallback", lang, error=cat_problem) if cat_problem else None
+    if cat_warning:
+        print(cat_warning)
     if args.dry_run:
         return EXIT_OK
     ask = _ask(args.yes)
     if not ask(t("confirm.proceed", lang)):
         return EXIT_CANCELLED
 
-    warnings: list[str] = []
+    warnings: list[str] = [cat_warning] if cat_warning else []
     status = ensure_installed(runner, m, plan.install)
     for comp, st in status.items():
         if st != "ok":

@@ -15,6 +15,13 @@ def test_main_dry_run_writes_nothing(fake_runner, tmp_path, capsys):
     assert code == 0 and fake_runner.calls == [] and list(tmp_path.iterdir()) == []
     out = capsys.readouterr().out
     assert "Installation plan" in out and "bonsai-2:9b" in out
+    assert "Model catalog: bundled" in out and "offline in tests" in out
+
+
+def test_main_explicit_catalog_failure_is_fatal(fake_runner, tmp_path, capsys):
+    code = main(["--dry-run", "--lang", "en", "--catalog", str(tmp_path / "nope.json")], runner=fake_runner,
+                detect=lambda r: machine())
+    assert code == 3 and "Could not use the catalog" in capsys.readouterr().out
 
 
 def test_main_restores_on_failed_check(fake_runner, tmp_path):
