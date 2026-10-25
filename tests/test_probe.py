@@ -1,17 +1,22 @@
 import json
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from pathlib import Path
 
 import pytest
 
-from freeagent.catalog import LocalTier
+from freeagent.catalog import CloudCandidate, LocalTier
 from freeagent.probe import (
+    NO_USAGE_REPORT,
+    ProbeResult,
     ensure_ollama_running,
     fit_local,
     last_served,
     parse_ollama_ps,
+    probe_cloud,
     probe_openai,
     probe_via_hermes,
+    probe_via_hermes_log,
 )
 from freeagent.runner import RunResult
 from tests.conftest import fixture
@@ -59,23 +64,87 @@ def _logging_runner(fake_runner, home, model, provider):
     return fake_runner
 
 
+def _usage_runner(fake_runner, served: dict[str, str] | None = None, *, failed=False, before=None):
+    """Answers `hermes -z` like Hermes: the usage report names the model that served each alias."""
+    def write(args):
+        if before:
+            before(args)
+        if "--usage-file" in args:
+            alias = args[args.index("-m") + 1]
+            report = {"model": (served or {}).get(alias, NEMO), "provider": "x", "api_calls": 1, "failed": failed}
+            Path(args[args.index("--usage-file") + 1]).write_text(json.dumps(report))
+    fake_runner.default = RunResult(0, "OK", "")
+    fake_runner.on_run = write
+    return fake_runner
+
+
 def test_probe_via_hermes_accepts_expected_model(fake_runner, hermes_home):
-    runner = _logging_runner(fake_runner, hermes_home, NEMO, "nvidia")
-    r = probe_via_hermes(runner, hermes_home, "nemotron", NEMO)
-    assert r.ok and fake_runner.calls[0]["args"][:5] == ["hermes", "chat", "--oneshot", "-m", "nemotron"]
+    r = probe_via_hermes(_usage_runner(fake_runner), hermes_home, "nemotron", NEMO)
+    args = fake_runner.calls[0]["args"]
+    assert r.ok and args[:5] == ["hermes", "-z", "Reply only: OK", "-m", "nemotron"] and "--usage-file" in args
     assert fake_runner.calls[0]["env"]["HERMES_HOME"] == str(hermes_home)
 
 
 def test_probe_via_hermes_rejects_fallback(fake_runner, hermes_home):
-    runner = _logging_runner(fake_runner, hermes_home, "gpt-5.6-terra", "openai-codex")
-    r = probe_via_hermes(runner, hermes_home, "nemotron", NEMO)
+    r = probe_via_hermes(_usage_runner(fake_runner, {"nemotron": "gpt-5.6-terra"}), hermes_home, "nemotron", NEMO)
     assert not r.ok and r.reason == "served_by_other"
 
 
-def test_probe_via_hermes_ignores_old_log_lines(fake_runner, hermes_home):
+def test_probe_via_hermes_failed_run(fake_runner, hermes_home):
+    r = probe_via_hermes(_usage_runner(fake_runner, failed=True), hermes_home, "nemotron", NEMO)
+    assert not r.ok and r.reason.startswith("no_response")
+
+
+def test_probe_via_hermes_without_usage_report(fake_runner, hermes_home):
+    fake_runner.default = RunResult(2, "", "unrecognized arguments: --usage-file")
+    assert probe_via_hermes(fake_runner, hermes_home, "nemotron", NEMO).reason == NO_USAGE_REPORT
+
+
+def test_probe_via_hermes_log_accepts_expected_model(fake_runner, hermes_home):
+    runner = _logging_runner(fake_runner, hermes_home, NEMO, "nvidia")
+    r = probe_via_hermes_log(runner, hermes_home, "nemotron", NEMO)
+    assert r.ok and fake_runner.calls[0]["args"][:5] == ["hermes", "chat", "--oneshot", "-m", "nemotron"]
+
+
+def test_probe_via_hermes_log_rejects_fallback(fake_runner, hermes_home):
+    runner = _logging_runner(fake_runner, hermes_home, "gpt-5.6-terra", "openai-codex")
+    assert probe_via_hermes_log(runner, hermes_home, "nemotron", NEMO).reason == "served_by_other"
+
+
+def test_probe_via_hermes_log_ignores_old_log_lines(fake_runner, hermes_home):
     fake_runner.default = RunResult(1, "", "boom")          # nothing new logged; old line must not count
-    r = probe_via_hermes(fake_runner, hermes_home, "nemotron", NEMO)
-    assert not r.ok
+    assert not probe_via_hermes_log(fake_runner, hermes_home, "nemotron", NEMO).ok
+
+
+CANDS = [CloudCandidate("a", "nvidia", NEMO, "a", "heavy"), CloudCandidate("b", "gemini", "g", "b", "mid")]
+
+
+def test_probe_cloud_runs_concurrently_and_keeps_order(fake_runner, hermes_home):
+    both_running = threading.Barrier(2, timeout=5)    # breaks (and the probe fails) if run one at a time
+    runner = _usage_runner(fake_runner, {"a": NEMO, "b": "g"}, before=lambda args: both_running.wait())
+    seen = []
+    results = probe_cloud(runner, hermes_home, CANDS, {}, lambda c, r: seen.append(c.id))
+    assert [(c.id, r.ok) for c, r in results] == [("a", True), ("b", True)] and sorted(seen) == ["a", "b"]
+
+
+def test_probe_cloud_retries_old_hermes_one_at_a_time(fake_runner, hermes_home):
+    def old_hermes(args):                               # no -z/--usage-file: only the log says who answered
+        if args[1] == "chat":
+            alias = args[args.index("-m") + 1]
+            with open(hermes_home / "logs" / "agent.log", "a") as f:
+                f.write(LOG_LINE.format(model={"a-free": NEMO, "b": "g"}[alias], provider="x"))
+    fake_runner.default = RunResult(0, "OK", "")
+    fake_runner.on_run = old_hermes
+    results = probe_cloud(fake_runner, hermes_home, CANDS, {"a": "a-free"}, lambda c, r: None)
+    assert all(r.ok for _, r in results)
+    legacy = [c["args"] for c in fake_runner.calls if c["args"][1] == "chat"]
+    assert [a[a.index("-m") + 1] for a in legacy] == ["a-free", "b"]      # renamed alias used, in order
+
+
+def test_probe_cloud_uses_http_for_ollama(fake_runner, hermes_home, monkeypatch):
+    monkeypatch.setattr("freeagent.probe.probe_openai", lambda base, key, model: ProbeResult(model, True, 1.0, "ok"))
+    c = CloudCandidate("o", "ollama-cloud", "gemma4:31b-cloud", "o", "mid")
+    assert probe_cloud(fake_runner, hermes_home, [c], {}, lambda *a: None)[0][1].ok and fake_runner.calls == []
 
 
 def _serve(status, body):

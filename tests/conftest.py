@@ -48,3 +48,13 @@ def machine(*, gpu="nvidia", gpu_free=7000, os="linux", lang="en", hermes=False,
     tools = Tools(hermes=hermes, omh=omh, ollama=ollama, codex=codex_logged_in if codex is None else codex,
                   codex_logged_in=codex_logged_in)
     return Machine(os=os, gpu=g, ram_gb=32.0, cpu_cores=8, disk_free_gb=200.0, lang=lang, tools=tools)
+
+
+@pytest.fixture(autouse=True)
+def offline_catalog(monkeypatch):
+    """Tests never download the online catalog; the default run falls back to the bundled one."""
+    from freeagent import catalog
+
+    def no_network(url):
+        raise catalog.CatalogError("offline in tests")
+    monkeypatch.setattr(catalog, "_fetch", no_network)

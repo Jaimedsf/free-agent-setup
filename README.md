@@ -73,7 +73,11 @@ local model becomes the main model and the report says so. Providers billed per 
 --skip-local   no local model
 --skip-cloud   no cloud providers
 --rollback     restore the config from the latest backup
+--catalog X    model catalog: an https URL, a file, or `bundled`
 ```
+
+The list of free models changes often, so each run first downloads the latest catalog from this repository. If
+that fails (offline, invalid file), the catalog bundled with your version is used and the report says so.
 
 On Windows, pass options through an environment variable:
 

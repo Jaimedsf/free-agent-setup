@@ -74,7 +74,11 @@ vira o principal e o relatório avisa. Provedores cobrados por token nunca são 
 --skip-local   sem modelo local
 --skip-cloud   sem provedores na nuvem
 --rollback     restaura o config do último backup
+--catalog X    catálogo de modelos: uma URL https, um arquivo ou `bundled`
 ```
+
+A lista de modelos grátis muda com frequência, então cada execução baixa primeiro o catálogo mais recente deste
+repositório. Se falhar (sem internet, arquivo inválido), usa o catálogo que veio com a sua versão e o relatório avisa.
 
 No Windows, as opções vão por uma variável de ambiente:
 
